@@ -1,0 +1,22 @@
+#!/bin/bash
+
+dd="/etc/default/dnsmasq"
+test -f "$dd" && sed -i -e 's,^ENABLED=1,ENABLED=0,' "$dd" || echo "ENABLED=0" > "$dd"
+
+apt-get -y install kvm dnsmasq realpath libconfig-tiny-perl socat
+
+# Stop and disable system-wide dnsmasq..
+sed -i -e 's,^ENABLED=1,ENABLED=0,' "$dd"
+pkill -f /var/run/dnsmasq/dnsmasq.pid
+# todo!!! fixme??? restore /etc/resolv.conf
+
+D="/storage/kvm"
+mkdir -p "$D"
+cd "$D"
+mkdir -p bin etc/{,dhcp,vm} iso presets run/{,dhcp,monitor,net,vnc} vm
+
+XEN_RESERVED="00:16:3e"
+printf '\nMAC base = %s:%02x:%02x:%02x\n' $XEN_RESERVED \
+	$[RANDOM % 128] $[RANDOM % 256] $[RANDOM % 256]
+
+## EOF ##

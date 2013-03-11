@@ -1,0 +1,283 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use FindBin;
+use Cwd qw/abs_path/;
+use Config::Tiny;
+use Socket qw/inet_aton inet_ntoa/;
+
+# Constants
+my $MAX_CFG_NESTING = 8;
+my $MAX_DRIVES = 4;
+my $MAX_NICS = 4;
+
+# Directories
+my $topdir     = abs_path("$FindBin::RealBin/..");
+my $bindir     = "$topdir/bin";
+my $imgdir     = "$topdir/vm";
+my $cfgdir     = "$topdir/vm";
+my $incdir     = "$topdir/etc/vm";
+my $isodir     = "$topdir/iso";
+my $netdir     = "$topdir/run/net";
+my $dhcpdir    = "$topdir/run/dhcp";
+my $monsockdir = "$topdir/run/monitor";
+my $presetsdir = "$topdir/presets";
+
+# Variables
+my $daemonize = 1;
+my $dryrun;
+my $runlevel;
+my $verbose;
+
+my @opts;
+
+# Supported KVM options
+my %opt2kvm = (
+	   'ramsize' => '-m',
+	   'balloon' => '-balloon',
+	      'boot' => '-boot',
+);
+
+# Defaults
+my @configs = ( { common => { 'balloon' => 'virtio' } } );
+
+
+#===============================================================
+#
+#   Routines
+
+sub usage {
+	print "Error: @_\n" if @_;
+	print "Usage: vmstart [option] vmname\n";
+	exit 99;
+}
+
+sub find_flag($$) {
+	my ($opt, $line) = @_;
+	#print "find_flag: opt = $opt, line = $line.\n";
+	my ($name, undef) = split /\s*=\s*/, $opt;
+	die "Missing option name: $opt\n" unless $name;
+	foreach(split( /\s*,\s*/, $line )) {
+		die "Wrong flags: $line\n"
+			unless /^(.+)\s*=\s*(.+)$/;
+		#print "find_flag: check $1 = $name, return $_.\n";
+		return $_ if $1 eq $name;
+	}
+	undef;
+}
+
+sub merge_flags($$) {
+	my @ret;
+	my ($base, $override) = @_;
+	foreach (split /\s*,\s*/, $base || '') {
+		push @ret, find_flag($_, $override) || $_;
+	}
+	foreach (split /\s*,\s*/, $override || '') {
+		push @ret, $_ unless find_flag($_, $base);
+	}
+	#print "merge_flags = @ret\n";
+	join(',',@ret) || '';
+}
+
+sub get_section($) {
+	my $section = shift;
+	my %ret;
+	foreach my $c (@configs) {
+		my $s = $c->{$section} or next;
+		while (my ($k,$v) = each %$s) {
+			next if $k =~ /^override_/ or $k =~ /_override$/;
+			#print "Assign $section: $k = $v\n";
+			$ret{$k} = $v;
+		}
+		while (my ($k,$v) = each %$s) {
+			next unless $k =~ /^override_(.*)$/ or $k =~ /^(.*)_override$/;
+			print "Merge $v to $1 = ".($ret{$1} || '')."\n" if $verbose;
+			$ret{$1} = merge_flags($ret{$1}, $v);
+			print "Merge result = $ret{$1}\n" if $verbose;
+		}
+	}
+	return \%ret if %ret;
+	undef;
+}
+
+sub read_config($) {
+	my $cfgname = $_[0];  # todo??? fixme!!! cleanup filename...
+	my $cfgpath = "$cfgdir/$cfgname.cfg";
+	$cfgpath = "$incdir/$cfgname.cfg" unless -f $cfgpath;
+	print "Read config: $cfgpath...\n" if $verbose;
+	Config::Tiny->read($cfgpath)
+		or die "Cannot read config from $cfgpath: $!\n";
+}
+
+sub str2ip($) { local $_ = shift or return 0;  $_ = inet_aton($_)  or return 0;  unpack("N*", $_) }
+sub ip2str($) { local $_ = shift or return ''; $_ = pack("N*", $_) or return ''; inet_ntoa($_) }
+
+
+#===============================================================
+#
+#  Parse command line
+
+while(@ARGV and $ARGV[0] =~ /^-/) {
+	my $opt = shift @ARGV;
+	if ($opt eq '--help') {
+		usage;
+	} elsif ($opt eq '--foreground') {
+		$daemonize = 0;
+	} elsif ($opt eq '--dry-run' or $opt eq '--dryrun') {
+		$dryrun = 1;
+	} elsif ($opt eq '--run-level' or $opt eq '--runlevel') {
+		usage "missing runlevel value" unless @ARGV;
+		$runlevel = shift @ARGV;
+		usage "wrong runlevel value"
+			unless $runlevel =~ /^-?\d+$/;
+	} elsif ($opt eq '--verbose') {
+		$verbose = 1;
+	} else {
+		die "Unknown option: $opt\n";
+	}
+}
+
+die "Wrong params count!\n" if @ARGV > 1;
+
+my $vmname = $ARGV[0] or die "Missing vmname!\n";
+(my $vmid = $vmname) =~ s/[^0-9]//g;
+
+
+#===============================================================
+#
+#  Read config files
+
+my $cfgname = $vmname;
+my $first = 1;
+
+while (my $cfg = read_config($cfgname)) {
+	die "Too big configs nesting!\n" if @configs >= $MAX_CFG_NESTING;
+	unshift @configs, $cfg;
+
+	my $main = $cfg->{_} or last;
+
+	my $r = $main->{runlevel};
+	#printf "Debug: runlevel: required=%s, actual=%s\n", $runlevel||0, $r||0;
+	if (($runlevel ||= 0) > ($r ||= 0)) {
+		print "$cfgname: skipped $r on runlevel $runlevel...\n" if $verbose;
+		exit 98;
+	}
+
+	if ($first) {
+		$vmid   = $main->{vmid}   if $main->{vmid};
+		$vmname = $main->{vmname} if $main->{vmname};
+		$first = 0;
+	}
+	$cfgname = $main->{parent} or last;
+}
+
+#{ use Data::Dumper; print "Config: ", Dumper($_),"\n" foreach @configs; }
+
+
+#===============================================================
+#
+#  Put common options
+
+push @opts, '-daemonize' if $daemonize;
+push @opts,
+	'-enable-kvm',
+	'-name',    "kvm_$vmid",
+	'-vnc',     "127.0.0.1:${vmid}",
+	'-monitor', "unix:${monsockdir}/${vmname}.mon,server,nowait";
+
+my $common = get_section('common') or die "Missing 'common' section!\n";
+while (my ($k,$v) = each %$common) {
+	my $n = $opt2kvm{$k} or die "Wrong option $k!\n";
+	push @opts, $n;
+	push @opts, $v if length($v);
+}
+
+
+#===============================================================
+#
+#  Disk devices
+
+for (0 .. ($MAX_DRIVES-1)) {
+	my $d = get_section("drive$_") or next;
+	my $f = $d->{image};
+	next if !$f or $f eq 'none';
+	if ($f ne 'auto') {
+		# todo??? fixme!!! cleanup filename...
+		$f =~ s!^/!!;
+		$f =~ s!\.\./!_!g;   # ..suppress directory leaving
+		$f =~    s!^ISO_DIR:!$isodir/!;
+		$f =~ s!^PRESET_DIR:!$presetsdir/!;
+	} elsif ($_) {
+		$f = "$imgdir/${vmname}_drive$_.img" 
+	} else {
+		$f = "$imgdir/$vmname.img" 
+	}
+	push @opts, '-drive', $d->{flags}
+		? join(',',"index=$_","file=$f",$d->{flags})
+		: join(',',"index=$_","file=$f");
+}
+
+#===============================================================
+#
+#  Network interfaces
+
+my $main = get_section('_');
+
+for (0 .. ($MAX_NICS-1)) {
+	my $n = get_section("net$_") or next;
+	my $model = $n->{model} || 'virtio';
+	my $index = $vmid + $_;
+	my $iface = "tap$index";
+	my $netmode = $n->{netmode} || 'proxyarp';
+
+	my $macaddr = $n->{macaddr};
+	if (!$macaddr or $macaddr eq 'auto') {
+		my $macbase = $main->{macbase}
+			or die "Missing 'macbase' configuration value!\n";
+		my @m = split /:/, $macbase;
+		$macaddr = sprintf '%02s:%02s:%02s:%02s:%02x:%02x',
+			$m[0], $m[1], $m[2], $m[3],
+			int($index / 256), $index % 256;
+	}
+
+	my $ipaddr = $n->{ipaddr};
+	if (!$ipaddr or $ipaddr eq 'auto') {
+		my $netaddr = $main->{netaddr}
+			or die "Missing 'netaddr' configuration value!\n";
+		$ipaddr = ip2str(str2ip($netaddr) + $vmid);
+	}
+
+	push @opts,
+		'-net', "nic,vlan=$index,model=$model,macaddr=$macaddr",
+		'-net', "tap,vlan=$index,ifname=$iface,script=$bindir/kvm-ifup,downscript=$bindir/kvm-ifdown";
+
+	my $f = "$netdir/$iface.conf";
+	open F, "> $f" or die "Cannot create netconf $f: $!\n";
+	print F "netmode=\"$netmode\"\n";
+	print F "ipaddr=\"$ipaddr\"\n";
+	close F;
+
+	my @a = split /\s+/, $ipaddr;
+	$f = "$dhcpdir/$iface.conf";
+	open F, "> $f" or die "Cannot create dhcpconf $f: $!\n";
+	print F "dhcp-host=$macaddr,set:vm$vmid,$a[0]\n" if @a;
+	close F;
+}
+
+
+#===============================================================
+#
+#  Call loader
+
+if ($dryrun) {
+	print "$_\n" foreach @opts;
+	exit 0;
+}
+
+exec { 'kvm' } 'kvm', @opts
+	or print STDERR "Cannot exec kvm for $vmname: $!\n";
+exit $?;
+
+## EOF ##

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+logger "kvm-ifdown: $1"
+
+## EOF ##

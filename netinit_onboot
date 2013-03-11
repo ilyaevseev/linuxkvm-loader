@@ -1,0 +1,10 @@
+#!/bin/sh
+
+sysctl "net.ipv4.ip_forward=1"
+sysctl "net.ipv4.conf.eth0.proxy_arp=1"  # eth0 ??? todo!!! fixme...
+
+topdir=$(realpath $(dirname $0)/..)
+
+$topdir/bin/dnsmasq_restart
+
+## EOF ##

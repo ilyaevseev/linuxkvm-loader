@@ -1,0 +1,12 @@
+#!/bin/sh
+
+topdir=$(realpath $(dirname $0)/..)
+
+echo "Try to (re)start dnsmasq DHCP server..."
+
+killall -q dnsmasq
+sleep 1
+
+dnsmasq --conf-dir="$topdir/etc/dhcp" --conf-dir="$topdir/run/dhcp"
+
+## EOF ##
