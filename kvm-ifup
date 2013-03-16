@@ -69,10 +69,9 @@ case "$netmode" in
 
 		ip route add "$a/32" dev "$iface" src "$me"
 
-		$bindir/dnsmasq_restart
-
 		logger -s "kvm-ifup: $iface: ip=$a, me=$me/$mm, basedev=$dv."
 	done
+	$bindir/dnsmasq_restart
 	;;
 
 * ) Die "unknown $iface netmode $netmode"; exit 1;;
