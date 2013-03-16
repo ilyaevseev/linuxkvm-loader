@@ -5,6 +5,7 @@ bindir=$topdir/bin
 netdir=$topdir/run/net
 
 iface="$1"
+action="$2"
 f="$netdir/$iface.conf"
 
 Die() { echo "kvm-ifup: ${iface}: Error: $*"; exit 1; }
@@ -12,8 +13,24 @@ Die() { echo "kvm-ifup: ${iface}: Error: $*"; exit 1; }
 test -n "$iface" || Die "missing interface name.";
 test -f "$f" || Die "missing config: $f"
 
-ip link list dev "$iface" 2>/dev/null | grep -q ',UP,' \
-	&& Die "interface already active.";
+case "$action" in
+"" )	ip link list dev "$iface" 2>/dev/null \
+	| grep -q ',UP,' \
+	&& Die "interface already active."
+	;;
+"linkreset" )
+	ip link set "$iface" down
+	sleep 2
+	ip link set "$iface" up
+	;;
+"ipreset" )
+	ip -o addr list dev "$iface" \
+	| grep ' inet ' \
+	| sed -e 's,.* inet ,,; s, .*,,' \
+	| while read a; do ip addr del "$a" dev "$iface"; done
+	;;
+* ) Die "unknown action $action" ;;
+esac
 
 . "$f"
 # netmode=proxyarp, ipaddr
