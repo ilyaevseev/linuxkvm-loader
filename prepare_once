@@ -3,7 +3,7 @@
 dd="/etc/default/dnsmasq"
 test -f "$dd" && sed -i -e 's,^ENABLED=1,ENABLED=0,' "$dd" || echo "ENABLED=0" > "$dd"
 
-apt-get -y install kvm dnsmasq realpath libconfig-tiny-perl socat arping mercurial
+apt-get -y install kvm dnsmasq realpath libconfig-tiny-perl socat arping mercurial htop
 
 # Stop and disable system-wide dnsmasq..
 sed -i -e 's,^ENABLED=1,ENABLED=0,' "$dd"
