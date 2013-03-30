@@ -251,7 +251,8 @@ for (0 .. ($MAX_NICS-1)) {
 
 	push @opts,
 		'-net', "nic,vlan=$index,model=$model,macaddr=$macaddr",
-		'-net', "tap,vlan=$index,ifname=$iface,script=$bindir/kvm-ifup,downscript=$bindir/kvm-ifdown";
+		'-net', "tap,vlan=$index,ifname=$iface,vhost=on,"
+		       ."script=$bindir/kvm-ifup,downscript=$bindir/kvm-ifdown";
 
 	my $f = "$netdir/$iface.conf";
 	open F, "> $f" or die "Cannot create netconf $f: $!\n";
