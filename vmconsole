@@ -1,0 +1,43 @@
+#!/bin/bash
+
+topdir=$(realpath $(dirname $0)/..)
+
+Die() { echo "$@"; exit 1; }
+
+Assign() {
+	test -z "$3" && "Cannot detect $2."
+	eval $1=$3
+	echo "DEBUG: $1=$3"
+}
+
+test $# = 1 || Die "Usage: $0 <vmname or vmip>"
+
+case "$1" in
+[1-9]*.[1-9]*.[1-9]*.[1-9]* )
+	vmip="$1"
+	Assign vmdev  "VM netdev"  "$(ip route get $vmip | head -1 | sed -e 's,.* dev ,,' -e 's, .*,,')"
+	Assign vmpid  "VM pid"     "$(pgrep -fn ifname=$vmdev)"
+	Assign vmport "VM port"    "$(netstat -ntlp | grep -w $vmpid/kvm | sed -e 's,.* 127.0.0.1:,,' -e 's, .*,,')"
+	Assign vmmon  "VM monitor" "$(lsof -p $vmpid | grep /storage/kvm/run/monitor | sed -e 's,.* ,,')"
+	;;
+* )
+	vmname="$1"
+	vmmon="$topdir/run/monitor/$vmname.mon"
+	test -S "$vmmon" || Die "$vmname seems not running, socket $vmmon missing."
+	Assign vmpid  "VM pid"     "$(lsof -Fp $vmmon | sed -e 's,p,,')"
+	;;
+esac
+
+Assign vmport  "VM port"   "$(netstat -ntlp | grep -w $vmpid/kvm | sed -e 's,.* 127.0.0.1:,,' -e 's, .*,,')"
+Assign pubaddr "Public IP" "$(ip route get 8.8.8.8 | head -1 | sed -e 's,.* src ,,' -e 's, .*,,')"
+
+vncpass=""    #  $[RANDOM % 10] requires Bash, may be missing in plain shell?
+for n in 1 2 3 4 5 6 7 8; do vncpass="$vncpass$[RANDOM % 10]"; done
+echo change vnc password $vncpass | socat - $vmmon; echo
+echo "VNC password: $vncpass"
+echo "VNC address: $pubaddr:$vmport"
+# todo!!! ,su=nobody
+socat TCP-LISTEN:"$vmport,reuseaddr,bind=$pubaddr" TCP:"127.0.0.1:$vmport"
+echo "VNC done."
+
+## EOF ##
