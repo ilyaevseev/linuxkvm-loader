@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# UNFINISHED!!!
+
+test -n "$1" || { echo "Usage: $0 ipaddr"; exit 1; }
+
+/bin/ping -nq -w5 -c1 "$1"
+
+macaddr="$(ip -o neighbor show $1 | sed -e 's,.* lladdr ,,' -e 's, .*,,')"
+
+test -z "$macaddr" || { echo "Error: cannot detect MAC address"; exit 1; }
+
+maclist="$(arp -an | grep $macaddr | sed -e 's,.* (,,' -e 's,) at .*,,')"
+
+# filter farms...
+# not found? scan farms and try to filter again...
+
+## EOF ##
