@@ -1,21 +1,19 @@
 #!/bin/bash
 
-dd="/etc/default/dnsmasq"
-test -f "$dd" && sed -i -e 's,^ENABLED=1,ENABLED=0,' "$dd" || echo "ENABLED=0" > "$dd"
-
 apt-get -y install kvm dnsmasq realpath libconfig-tiny-perl socat arping mercurial htop lsof
 
 # Stop and disable system-wide dnsmasq..
-sed -i -e 's,^ENABLED=1,ENABLED=0,' "$dd"
-pkill -f /var/run/dnsmasq/dnsmasq.pid
-# todo!!! fixme??? restore /etc/resolv.conf
+service dnsmasq stop
+sed -ie 's,^ENABLED=1,ENABLED=0,' "/etc/default/dnsmasq"
+f="/var/run/dnsmasq/dnsmasq.pid"
+test -s "$f" && pkill -f "$f" && echo "IMPORTANT!!! Check /etc/resolv.conf after killing system-wide dnsmasq!"
 
 D="/storage/kvm"
 mkdir -p "$D"
 cd "$D"
 mkdir -p bin etc iso presets run/{,dhcp,monitor,net,vnc} vm
 #mkdir -p etc/{,dhcp,vm}
-hg clone ssh://repo/vmscripts bin
+hg clone http://code.google.com/p/linuxkvm-loader/ bin
 hg clone ssh://repo/vmconf    etc
 
 XEN_RESERVED="00:16:3e"
