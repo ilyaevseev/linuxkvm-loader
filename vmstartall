@@ -1,0 +1,21 @@
+#!/bin/sh
+
+SLEEP_SECONDS="90"
+
+topdir="$(realpath $(dirname $0)/..)"
+bindir="$topdir/bin"
+cfgdir="$topdir/vm"
+
+cd "$cfgdir" || { echo "Error: cannot chdir to $vmdir, failed."; exit 1; }
+
+need_sleep=
+
+for f in *.cfg; do
+    # No configs? Leave loop..
+    test "$f" = '*.cfg' && break
+    # Reduce KVM farm cpu/hdd utilization - wait while previous container is starting...
+    test -n "$need_sleep" && sleep "$SLEEP_SECONDS"
+    $bindir/vmstart `basename $f .cfg` && need_sleep=1 || need_sleep=
+done
+
+## EOF ##
