@@ -21,6 +21,7 @@ my $cfgdir     = "$topdir/vm";
 my $incdir     = "$topdir/etc/vm";
 my $isodir     = "$topdir/iso";
 my $netdir     = "$topdir/run/net";
+my $vncdir     = "$topdir/run/vnc";
 my $dhcpdir    = "$topdir/run/dhcp";
 my $monsockdir = "$topdir/run/monitor";
 my $presetsdir = "$topdir/presets";
@@ -221,7 +222,7 @@ push @opts, '-daemonize' if $daemonize;
 push @opts,
 	'-enable-kvm',
 	'-name',    "kvm_$vmid",
-	'-vnc',     "127.0.0.1:${vmid}",
+	'-vnc',     "unix:${vncdir}/${vmname}.vnc",
 	'-monitor', "unix:${monsockdir}/${vmname}.mon,server,nowait";
 
 my $common = get_section('common') or die "Missing 'common' section!\n";
