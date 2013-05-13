@@ -244,9 +244,9 @@ for (0 .. ($MAX_DRIVES-1)) {
 	if ($f ne 'auto') {
 		$f = clean_filename($f, $imgdir);
 	} elsif ($_) {
-		$f = "$imgdir/${vmname}_drive$_.img" 
+		$f = clean_filename("${vmname}_drive$_.img", $imgdir);
 	} else {
-		$f = "$imgdir/$vmname.img" 
+		$f = clean_filename("${vmname}.img", $imgdir);
 	}
 	push @opts, '-drive', $d->{flags}
 		? join(',',"index=$_","file=$f",$d->{flags})
