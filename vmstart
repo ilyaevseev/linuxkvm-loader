@@ -24,12 +24,14 @@ my $netdir     = "$topdir/run/net";
 my $dhcpdir    = "$topdir/run/dhcp";
 my $monsockdir = "$topdir/run/monitor";
 my $presetsdir = "$topdir/presets";
+my $pathfile   = "$topdir/etc/paths.cfg";
 
 # Variables
 my $daemonize = 1;
 my $dryrun;
 my $runlevel;
 my $verbose;
+my $pathlist;
 
 my @opts;
 
@@ -102,10 +104,35 @@ sub get_section($) {
 	undef;
 }
 
+sub prefix2dir($$) {
+	my ($prefix, $f) = @_;
+	die "Empty prefix in $f\n" if !$prefix;
+	return $pathlist->{$prefix} if $pathlist and $pathlist->{$prefix};
+	return     $isodir if $prefix eq    'ISO_DIR';
+	return $presetsdir if $prefix eq 'PRESET_DIR';
+	die "Invalid prefix in $f: $prefix\n";
+}
+
+sub clean_path($) {
+	my $f = shift;
+	die "Invalid filename: $f" if $f =~ /^\// || $f =~ /\.\./;
+	$f;
+}
+
+sub clean_filename($;$) {
+	my ($f, $defdir) = @_;
+	return sprintf "%s/%s", prefix2dir($1, $f), clean_path($2)
+		if $f =~ /^(.+):(.+)$/;
+	clean_path($f);
+	return "$defdir/$f" if $defdir;
+	$f;
+}
+
 sub read_config($) {
-	my $cfgname = $_[0];  # todo??? fixme!!! cleanup filename...
-	my $cfgpath = "$cfgdir/$cfgname.cfg";
-	$cfgpath = "$incdir/$cfgname.cfg" unless -f $cfgpath;
+	my $f = shift;
+	$f = "$f.cfg" if $f !~ /\.cfg$/;
+	my $cfgpath = clean_filename($f, $cfgdir);
+	   $cfgpath = clean_filename($f, $incdir) unless -f $cfgpath;
 	print "Read config: $cfgpath...\n" if $verbose;
 	Config::Tiny->read($cfgpath)
 		or die "Cannot read config from $cfgpath: $!\n";
@@ -148,6 +175,16 @@ my $vmname = $ARGV[0] or die "Missing vmname!\n";
 #===============================================================
 #
 #  Read config files
+
+unless (-f $pathfile) {
+	print "Pathlist $pathfile not exists, skipped.\n" if $verbose;
+} else {
+	print "Read pathlist from $pathfile...\n" if $verbose;
+	my $p = Config::Tiny->read($pathfile)
+		or die "Cannot read pathlist from $pathfile\n";
+	$pathlist = $p->{_};
+	#{ use Data::Dumper; print "Pathlist: ", Dumper($pathlist),"\n"; }
+}
 
 my $cfgname = $vmname;
 my $first = 1;
@@ -204,11 +241,7 @@ for (0 .. ($MAX_DRIVES-1)) {
 	my $f = $d->{image};
 	next if !$f or $f eq 'none';
 	if ($f ne 'auto') {
-		# todo??? fixme!!! cleanup filename...
-		$f =~ s!^/!!;
-		$f =~ s!\.\./!_!g;   # ..suppress directory leaving
-		$f =~    s!^ISO_DIR:!$isodir/!;
-		$f =~ s!^PRESET_DIR:!$presetsdir/!;
+		$f = clean_filename($f, $imgdir);
 	} elsif ($_) {
 		$f = "$imgdir/${vmname}_drive$_.img" 
 	} else {
