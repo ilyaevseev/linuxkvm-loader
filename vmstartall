@@ -15,7 +15,7 @@ for f in *.cfg; do
     test "$f" = '*.cfg' && break
     # Reduce KVM farm cpu/hdd utilization - wait while previous container is starting...
     test -n "$need_sleep" && sleep "$SLEEP_SECONDS"
-    $bindir/vmstart `basename $f .cfg` && need_sleep=1 || need_sleep=
+    $bindir/vmstart "$@" `basename $f .cfg` && need_sleep=1 || need_sleep=
 done
 
 ## EOF ##
