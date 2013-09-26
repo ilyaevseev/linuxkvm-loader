@@ -41,6 +41,8 @@ my %opt2kvm = (
 	   'ramsize' => '-m',
 	   'balloon' => '-balloon',
 	      'boot' => '-boot',
+	      'cpus' => '-smp',
+	   'no-acpi' => '-no-acpi',
 );
 
 # Defaults
@@ -238,7 +240,8 @@ while (my ($k,$v) = each %$common) {
 #  Disk devices
 
 for (0 .. ($MAX_DRIVES-1)) {
-	my $d = get_section("drive$_") or next;
+	my $d = get_section("drive$_") || ( $_ ? undef : {image=>'auto'} )
+		or next;
 	my $f = $d->{image};
 	next if !$f or $f eq 'none';
 	if ($f ne 'auto') {
@@ -260,11 +263,14 @@ for (0 .. ($MAX_DRIVES-1)) {
 my $main = get_section('_');
 
 for (0 .. ($MAX_NICS-1)) {
-	my $n = get_section("net$_") or next;
+	my $n = get_section("net$_") || ( $_ ? undef : {} )
+		or next;
 	my $model = $n->{model} || 'virtio';
 	my $index = $vmid + $_;
 	my $iface = "tap$index";
 	my $netmode = $n->{netmode} || 'proxyarp';
+
+	next if $netmode eq 'none' || $model eq 'none';
 
 	my $macaddr = $n->{macaddr};
 	if (!$macaddr or $macaddr eq 'auto') {
