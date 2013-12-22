@@ -304,6 +304,7 @@ for (0 .. ($MAX_NICS-1)) {
 	$f = "$dhcpdir/$iface.conf";
 	open F, "> $f" or die "Cannot create dhcpconf $f: $!\n";
 	print F "dhcp-host=$macaddr,set:vm$vmid,$a[0]\n" if @a;
+	print F "interface=$iface\n";
 	close F;
 }
 
