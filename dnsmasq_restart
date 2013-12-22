@@ -4,7 +4,7 @@ topdir=$(realpath $(dirname $0)/..)
 
 echo "Try to (re)start dnsmasq DHCP server..."
 
-killall -q dnsmasq
+pkill -f -- "dnsmasq .*--conf-dir=$topdir/etc/dhcp --conf-dir=$topdir/run/dhcp"
 sleep 1
 
 p="53"; netstat -nulp | grep -q ":$p" && p="553" && echo "Use DNS port $p..."
