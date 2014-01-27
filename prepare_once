@@ -1,6 +1,9 @@
 #!/bin/bash
 
-apt-get -y install kvm dnsmasq realpath libconfig-tiny-perl socat arping mercurial htop lsof
+apt-get -y install kvm dnsmasq-base realpath libconfig-tiny-perl socat arping mercurial htop lsof
+#yum    -y install qemu-kvm dnsmasq          perl-Config-Tiny         iputils mercurial      lsof
+#yum    -y install --enablerepo=epel socat
+#rpm -Uvh "http://pkgs.repoforge.org/realpath/realpath-1.17-1.el6.rf.$(uname -m).rpm"
 
 # Stop and disable system-wide dnsmasq..
 service dnsmasq stop
