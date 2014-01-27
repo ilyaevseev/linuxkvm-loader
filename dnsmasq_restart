@@ -1,14 +1,18 @@
 #!/bin/sh
 
-topdir=$(realpath $(dirname $0)/..)
-
 echo "Try to (re)start dnsmasq DHCP server..."
 
-pkill -f -- "dnsmasq .*--conf-dir=$topdir/etc/dhcp --conf-dir=$topdir/run/dhcp"
+topdir=$(realpath $(dirname $0)/..)
+
+cmd="dnsmasq --conf-dir=$topdir/etc/dhcp --conf-dir=$topdir/run/dhcp"
+
+pkill -f -- "$cmd"
 sleep 1
 
-p="53"; netstat -nulp | grep -q ":$p" && p="553" && echo "Use DNS port $p..."
+Run() { LANG=C $cmd --port="$1" 2>&1 | grep -q "Address already in use" && return 1 || return 0; }
 
-dnsmasq --port="$p" --conf-dir="$topdir/etc/dhcp" --conf-dir="$topdir/run/dhcp"
+Run "53" || { echo "Use DNS port 5353..."; Run "5353"; }
+
+pgrep -f -- "$cmd" | grep -q '' || echo "$0: FAILED"
 
 ## EOF ##
