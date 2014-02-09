@@ -11,8 +11,4 @@ iptables -t mangle -I INPUT -i $EXT_IFACE -j RETURN
 sysctl "net.ipv4.ip_forward=1"
 sysctl "net.ipv4.conf.$EXT_IFACE.proxy_arp=1"
 
-topdir=$(realpath $(dirname $0)/..)
-
-$topdir/bin/dnsmasq_restart
-
-## EOF ##
+## END ##
