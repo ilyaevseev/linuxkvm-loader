@@ -1,5 +1,10 @@
 #!/bin/sh
 
+ topdir=$(realpath $(dirname $0)/..)
+dhcpdir=$topdir/run/dhcp
+
+rm -f "$dhcpdir/$1.conf"
+
 logger "kvm-ifdown: $1"
 
 ## EOF ##
