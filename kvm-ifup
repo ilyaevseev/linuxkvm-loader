@@ -56,8 +56,9 @@ case "$netmode" in
 			Die "$ipaddr seems already available on $dv as $a."
 		fi
 
-		sysctl "net.ipv4.conf.$iface.proxy_arp=1" > /dev/null
-		sysctl "net.ipv4.conf.$iface.rp_filter=1" > /dev/null
+		sysctl "net.ipv4.conf.$iface.proxy_arp=1"  > /dev/null
+		sysctl "net.ipv4.conf.$iface.rp_filter=1"  > /dev/null
+		sysctl "net.ipv4.conf.$iface.arp_ignore=3" > /dev/null  # ..visibility of IP-aliases on ethX
 
 		ip link set "$iface" up
 		ip addr add "$me/$mm" dev "$iface"
