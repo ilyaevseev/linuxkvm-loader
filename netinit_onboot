@@ -1,5 +1,10 @@
 #!/bin/sh
 
+ topdir=$(realpath $(dirname $0)/..)
+dhcpdir=$topdir/run/dhcp
+
+rm -f $dhcpdir/*.conf
+
 EXT_IFACE="$(ip route get 8.8.8.8 | grep ' dev ' | sed -e 's,.* dev ,,' -e 's, .*,,')"
 
 modprobe vhost-net
