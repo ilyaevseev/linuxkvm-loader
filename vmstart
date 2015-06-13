@@ -214,6 +214,8 @@ while (my $cfg = read_config($cfgname)) {
 }
 
 #{ use Data::Dumper; print "Config: ", Dumper($_),"\n" foreach @configs; }
+die "FATAL: vmid is missing, or invalid, or cannot be calculated from vmname!\n"
+	unless $vmid > 0;
 
 
 #===============================================================
