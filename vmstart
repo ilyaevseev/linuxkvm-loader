@@ -43,6 +43,7 @@ my %opt2kvm = (
 	      'boot' => '-boot',
 	      'cpus' => '-smp',
 	   'no-acpi' => '-no-acpi',
+	       'cpu' => '-cpu',
 );
 
 # Defaults
