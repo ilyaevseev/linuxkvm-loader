@@ -226,7 +226,7 @@ push @opts, '-daemonize' if $daemonize;
 push @opts,
 	'-enable-kvm',
 	'-name',    "kvm_$vmid",
-	'-vnc',     "unix:${vncdir}/${vmname}.vnc",
+	'-vnc',     "unix:${vncdir}/${vmname}.vnc,password",
 	'-monitor', "unix:${monsockdir}/${vmname}.mon,server,nowait";
 
 my $common = get_section('common') or die "Missing 'common' section!\n";
